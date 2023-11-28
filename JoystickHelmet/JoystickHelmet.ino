@@ -1,3 +1,5 @@
+#include <Arduino_LSM9DS1.h>
+
 double Vy;
 double Vx;
 double theta;
