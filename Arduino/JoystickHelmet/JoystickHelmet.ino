@@ -122,9 +122,9 @@ void off() {
   }
 }
 
-void buzz(int dt) {
+void buzz(int arr[],int dt) {
   for (int i = 0; i < 3; i++) {
-    on();
+    updateVibratio(arr);
     delay(dt);
     off();
     delay(dt);
