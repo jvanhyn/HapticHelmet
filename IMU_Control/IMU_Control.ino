@@ -1,4 +1,5 @@
 #include <Arduino_LSM9DS1.h>
+
 // Magnetometer range is set at [-400, +400] uT +/-0.014 uT.
 
 int myPins[] = {5, 6, 7, 8, 9, 10, 11, 12};
@@ -11,14 +12,11 @@ float mags;
 float thresh = 0.5;
 int heading;
 
+String str;
+
 void setup() {
-  Serial.begin(98600); // Start Serial Communitcation
+  Serial.begin(9600); // Start Serial Communitcation
   IMU.begin(); // Start IMU 
-
-  for (int i = 0; i <= 7; i++) pinMode(myPins[i], OUTPUT); // Initiate Digital Output Pins 
-
-  pinMode(A0, INPUT); 
-  pinMode(A1, INPUT);
 }
 
 void loop() {
@@ -54,4 +52,6 @@ void loop() {
   //   }
   // }
 
+  //str = String(x) + ","+String(y)+String(z);
+  //Serial.println(str);
 }
