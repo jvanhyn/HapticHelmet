@@ -1,5 +1,6 @@
-#define BUZZ
-//#define Joystick
+//#define BUZZ
+//#define PRESS
+#define Joystick
 
 // Pins corresponding to motors in the headband
 int myPins[] = { 2, 3, 4, 5, 6, 7, 8, 9 };
@@ -28,11 +29,11 @@ bool buttonPress;
 bool overide = 0;
 
 int count = 0;
-int debounce = 10;
+int debounce = 3;
 
 int freq[] = {200,100,50,25};
 
-int j=0;
+
 
 void setup() {
   Serial.begin(9600);
@@ -51,36 +52,35 @@ void loop() {
   u = (Vy) / 1023 * 2 - 1;  // Convert (Vx,Vy) to a vector inside the unit circle
   v = (Vx) / 1023 * 2 - 1;
 
-  if(j<3){
-  for(int i = 0; i < 3;i++){
-  on();
-  delay(freq[j]);
-  off();
-  delay(freq[j]);
-  }
-  delay(3000);
-  j++;
+ 
+ 
+  #ifdef BUZZ
+  if (Vbutton < 1) {
+    count++;
+  } else {
+    count = 0;
   }
 
-  // if (Vbutton < 1) {
-  //   count++;
-  // } else {
-  //   count = 0;
-  // }
+  if (count > debounce) {
+    buttonPress = true;
+  } else {
+    buttonPress = false;
+  }
 
-  // if (count > debounce) {
-  //   buttonPress = true;
-  // } else {
-  //   buttonPress = false;
-  // }
+  if(buttonPress){
+    buzz(100);
+  }
+  #endif
 
-  // if (buttonPress) {
-  //   overide = true;
-  //   on();
-  // } else {
-  //   overide = false;
-  //   off();
-  // }
+  #ifdef PRESS
+  if (buttonPress) {
+    overide = true;
+    on();
+  } else {
+    overide = false;
+    off();
+  }
+  #endif
 
 #ifdef Joystick
   if (!overide) {
@@ -102,19 +102,12 @@ void point(double x, double y) {
     motorNumber = -1;
   }
 
-  Serial.print(theta);
-  Serial.print(",");
-  Serial.print(motorNumber);
-  Serial.print(",");
-  Serial.println(mag);
-
-  for (int i = 0; i <= 7; i++) {
-    if (i == motorNumber) {
-      digitalWrite(myPins[i], HIGH);
-    } else {
-      digitalWrite(myPins[i], LOW);
-    }
+  bool arr[] = {false,false,false,false,false,false,false,false};
+  if(motorNumber>0){
+  arr[(int)motorNumber] = true;
   }
+
+  updateVibration(arr);
 }
 
 void on() {
@@ -130,10 +123,21 @@ void off() {
 }
 
 void buzz(int dt) {
-  for (int i = 0; i > 3; i++) {
+  for (int i = 0; i < 3; i++) {
     on();
     delay(dt);
     off();
     delay(dt);
+  }
+  delay(100);
+}
+
+void updateVibration(bool arr[]){
+  for (int i = 0; i <= 7; i++) {
+    if (arr[i]) {
+      digitalWrite(myPins[i], HIGH);
+    } else {
+      digitalWrite(myPins[i], LOW);
+    }
   }
 }
