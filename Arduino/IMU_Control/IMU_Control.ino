@@ -1,65 +1,84 @@
 #include <Arduino_LSM9DS1.h>
-float mx,my,mz;
-float ax,ay,az;
-float x,y,z;
-float cal_mx,cal_my,cal_mz;
-float u,v,w;
+#include <MadgwickAHRS.h>
+//#include <MPUOrientation.h>
 
-float alpha,beta;
+Madgwick filter;
+
+float ax,ay,az,mx,my,mz,gx,gy,gz;
+const float sensorRate = 104.00;
+int i = 1;
+float roll,pitch;
 String str;
-String str2;
-String str3;
-
 
 void setup() {
   Serial.begin(9600); // Start Serial Communitcation
   IMU.begin(); // Start IMU 
-  x = 0;
-  y = 0;
-  z = 0;
+  filter.begin(sensorRate);
 }
 
 void loop() {
-  //IMU.readMagneticField(mx, my, mz); // Read IMU DATA
 
-  if (IMU.accelerationAvailable()) {
-    IMU.readAcceleration(ax, ay, az);
-  }
-
+  IMU.readAcceleration(ax, ay, az);
+  IMU.readMagneticField(mx, my, mz);
+  IMU.readGyroscope(gz,gy,gz);
   
-  // cal_mx = mx - (25.63);
-  // cal_my = my - (8.78);
-  // cal_mz = mz - (-28.82);
+  // filter.updateIMU(gx,gy,gz,ax,ay,az);
 
-  e1Angle(ax,ay,az);
-  //str = String(cal_mx)+","+String(cal_my)+","+String(cal_mz);
-  // str2 = String(ax)+","+String(ay)+","+String(az);
-  // Serial.println(str2);
+  // roll = filter.getRoll();
+  // pitch = filter.getPitch();
 
-  str3 = String(u)+","+String(v)+","+String(w);
-  Serial.println(str3);
+
+  str = String(-ay)+","+String(ax)+","+String(az)+","+String(-gy)+","+String(gx)+","+String(gz)+","+ String(mz)+","+String(mx)+","+String(my);
+  Serial.println(str);
+  // mx = mx-cal_x;
+  // my = my-cal_y;
+  // mz = mz-cal_z;
+
+  // q = ax;
+  // r = ay;
+  // s = az;
+
+  // // fusion.update(gx,gy,gz,ax,ay,az); 
+
+  // // Serial.print( fusion.pitch() );
+  // // Serial.print( " " );
+  // // Serial.print( fusion.yaw() );
+  // // Serial.print( " " );
+  // // Serial.print( fusion.roll() );
+  // // Serial.println();
+
+  // alpha = atan2(r,q);
+
+  // u = q*cos(-alpha)-r*sin(-alpha);
+  // v = q*sin(-alpha)+r*cos(-alpha);
+  // w = s;
+
+  // beta = atan2(w,u);
+
+  // x = u*cos(-beta)-w*sin(-beta);
+  // y = v;
+  // z = u*sin(-beta)+w*cos(-beta);
+
+  // q = mx;
+  // r = my;
+  // s = mz;
+
+  // u = q*cos(-alpha)-r*sin(-alpha);
+  // v = q*sin(-alpha)+r*cos(-alpha);
+  // w = s;
+
+  // x = u*cos(-beta)-w*sin(-beta);
+  // y = v;
+  // z = u*sin(-beta)+w*cos(-beta);
+
+  // theta = atan2(y,x);
+  // alpha = alpha/PI*180;
+  // beta = beta/PI*180;
+  // theta = theta/PI*180;
+
+  // str = String(alpha)+","+String(beta)+","+String(theta);
+  // Serial.println(str);
  
 }
-
-
-void e1Angle(float x,float y,float z){
-alpha = atan2(y,x);
-u = x*cos(-alpha)-y*sin(-alpha);
-v = x*sin(-alpha)+y*cos(-alpha);
-w = z;
-beta = atan2(w,u);
-u = u*cos(-beta)-w*sin(-beta);
-v = v;
-w = u*sin(-beta)+w*cos(-beta);
-}
-
-// float rotate(float x, float y,float z,float alpha,float beta){
-// int u1 = x*cos(-alpha)-y*sin(-alpha);
-// int v1 = x*sin(-alpha)+y*cos(-alpha);
-// int w1 = z;
-// u = u1*cos(-beta)-w1*sin(-beta);
-// v = v1;
-// w = u1*sin(-beta)+w1*cos(-beta);
-// }
 
 
