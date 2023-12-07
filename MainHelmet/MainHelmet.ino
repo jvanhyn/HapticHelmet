@@ -58,8 +58,8 @@ void setup() {
   pinMode(A1, INPUT);
 
   // Set the number and values of each checkpoint and direction for the user to follow
-  num_checkpoints = 5;
-  checkpoints = {{{2, 1}, 270}, {{4, 1}, 90}, {{4, 4}, 90}, {{2, 4}, 270}, {{2, 8}, 0}};
+  num_checkpoints = 7;
+  checkpoints = {{{250, 150}, 270}, {{250, 750}, 90}, {{450, 750}, 90}, {{450, 450}, 270}, {{850, 450}, 270}}, {{850, 750}, 270}, {{750, 750}, 0};
   // initialize the user
   user = {{0, 0}, 0};
 }
