@@ -175,14 +175,14 @@ bool reached_poses(User you, Checkpoint check) {
 // Obtain the angle with respect to the physical headset for the motors to buzz based on the direction of the next checkpoint and where the user is looking
 int buzzDir(turn_ang, u_heading, imu_heading) {
 
-  dir = ch.dir;   // get the desired direction of turn from the next checkpoint (0 is straight and positive is anti-clockwise)
-  head = heading;
+  // dir = ch.dir;   // get the desired direction of turn from the next checkpoint (0 is straight and positive is anti-clockwise)
+  head = imu_heading;
   if (head < 0) {
     // heading is from 0 straight ahead and positive left but negative right toward +/- 180
     // we want 0 to 360 degree heading so change the right hand side from 0 to -180 to 360 to 180
     head = 360 + head; 
   }
-  buzz_dir = dir - head;  // account for the actual heading of the user (where they are looking) to buzz the correct angle for turn
+  buzz_dir = turn_ang - u_heading - imu_heading;  // account for the actual heading of the user (where they are looking) to buzz the correct angle for turn
   return buzz_dir;
 }
 
