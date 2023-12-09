@@ -21,15 +21,15 @@ void setup() {
 
 void loop() {
   IMU.readMagneticField(x, y, z); // Read IMU DATA
-  cal_x = x - 25.63;
-  cal_y = y - 8.78;
-  cal_z = z - (-28.82);
-  float h = (atan2(cal_y, cal_x) * 180) / PI;
+  // cal_x = x - 25.63;`
+  // cal_y = y - 8.78;
+  // cal_z = z - (-28.82);
+  // float h = (atan2(cal_y, cal_x) * 180) / PI;
   // theta = atan2(z, -x);           // Calculate Heading Angle 
-  Serial.println(h);
-  // Serial.print(String(x) + ", ");
-  // Serial.print(String(y) + ", ");
-  // Serial.println(String(z));
+  // Serial.println(h);
+  Serial.print(String(x) + ", ");
+  Serial.print(String(y) + ", ");
+  Serial.println(String(z));
   mags = sqrt(pow(x,2)+pow(y,2)); // Calculate Magnitude 
 
   // if(mags > thresh)
