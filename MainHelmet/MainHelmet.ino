@@ -3,18 +3,7 @@
 
 int myPins[] = {5, 6, 7, 8, 9, 10, 11, 12}; // pins on arduino for controlling each motor
 
-// initialize values for IMU readings
-float x, y, z;
-float u, v, w;
 
-// Variables related to positioning and navigation
-float theta;
-float mags;
-float thresh = 0.5;
-int heading;
-
-// float user_x = 0;
-// float user_y = 0;
 float dist = 0;
 int dir = 0;
 int unity_heading = 0;
@@ -22,37 +11,223 @@ int unity_heading = 0;
 float threshold = 1;  // Change this for how close user has to be
 int num_checkpoints;
 float buzz_freq = 1;    // buzz frequency at standard distance
-float d;
 float std_d = 100;      // standard distance is 100
 
 
+// IMU DATA
 
-// typedef struct
-// {
-//     float x;
-//     float y;
-// } Coord;
+// Number correponding to a motor at a specific location on the head
+static double motorNumber = 0;
 
-// typedef struct
-// {
-//     Coord pos;
-//     int dir;
-// } Checkpoint;
+// Orientation Information
+static double theta;
 
-// typedef struct
-// {
-//     Coord pos;
-//     float ang;
-// } User;
 
-// READING FROM UNITY
-// Example 5 - Receive with start- and end-markers combined with parsing
+// Button press
+bool buttonPress;
+
+//Overides all actions if true
+bool overide = 0;
+
+int count = 0;
+int debounce = 3;
+
+int freq[] = {200,100,50,25};
+
+
+
+float ax,ay,az,mx,my,mz,gx,gy,gz;
+float mxcal,mycal,mzcal;
+const float xcal = 8.2400;
+const float ycal = 7.8950;
+const float zcal = 8.4100;
+String output;
+
+
+#define Kp 50.0
+#define Ki 0.0
+
+unsigned long now = 0, last = 0; //micros() timers for AHRS loop
+float deltat = 0;  //loop time in seconds
+
+#define PRINT_SPEED 300 // ms between angle prints
+unsigned long lastPrint = 0; // Keep track of print time
+
+// equler
+static float ee[3] = {0,0,0};
+
+// Vector to hold quaternion
+static float q[4] = {1.0, 0.0, 0.0, 0.0};
+//static float yaw, pitch, roll; //Euler angle output
+
+void updateIMU() {
+  if (IMU.gyroscopeAvailable()) {
+
+    IMU.readGyroscope(gx, gy, gz);
+
+  }
+
+  
+  if (IMU.accelerationAvailable()) {
+
+    IMU.readAcceleration(ax, ay, az);
+
+  }
+  
+  IMU.readMagneticField(mx, my, mz);
+  
+  mxcal = mx-xcal;
+  mycal = my-ycal;
+  mzcal = mz-zcal;
+  now = micros();
+  deltat = (now - last) * 1.0e-6; //seconds since last update
+  last = now;
+  
+  MahonyQuaternionUpdate(-ax,ay,az,-gx/180*PI,gy/180*PI,gz/180*PI,mxcal,mycal,mzcal,deltat);
+ 
+
+  quat2eul();
+  theta = ee[2];
+}
+
+
+void MahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float deltat)
+{
+  // Vector to hold integral error for Mahony method
+  static float eInt[3] = {0.0, 0.0, 0.0};
+    // short name local variable for readability
+  float q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3];
+  float norm;
+  float hx, hy, hz;  //observed West horizon vector W = AxM
+  float ux, uy, uz, wx, wy, wz; //calculated A (Up) and W in body frame
+  float ex, ey, ez;
+  float pa, pb, pc;
+
+  // Auxiliary variables to avoid repeated arithmetic
+  float q1q1 = q1 * q1;
+  float q1q2 = q1 * q2;
+  float q1q3 = q1 * q3;
+  float q1q4 = q1 * q4;
+  float q2q2 = q2 * q2;
+  float q2q3 = q2 * q3;
+  float q2q4 = q2 * q4;
+  float q3q3 = q3 * q3;
+  float q3q4 = q3 * q4;
+  float q4q4 = q4 * q4;
+
+  // Measured horizon vector = a x m (in body frame)
+  hx = ay * mz - az * my;
+  hy = az * mx - ax * mz;
+  hz = ax * my - ay * mx;
+  // Normalise horizon vector
+  norm = sqrt(hx * hx + hy * hy + hz * hz);
+  if (norm == 0.0f) return; // Handle div by zero
+
+  norm = 1.0f / norm;
+  hx *= norm;
+  hy *= norm;
+  hz *= norm;
+
+  // Estimated direction of Up reference vector
+  ux = 2.0f * (q2q4 - q1q3);
+  uy = 2.0f * (q1q2 + q3q4);
+  uz = q1q1 - q2q2 - q3q3 + q4q4;
+
+  // estimated direction of horizon (West) reference vector
+  wx = 2.0f * (q2q3 + q1q4);
+  wy = q1q1 - q2q2 + q3q3 - q4q4;
+  wz = 2.0f * (q3q4 - q1q2);
+
+  // Error is the summed cross products of estimated and measured directions of the reference vectors
+  // It is assumed small, so sin(theta) ~ theta IS the angle required to correct the orientation error.
+
+  ex = (ay * uz - az * uy) + (hy * wz - hz * wy);
+  ey = (az * ux - ax * uz) + (hz * wx - hx * wz);
+  ez = (ax * uy - ay * ux) + (hx * wy - hy * wx);
+ 
+  if (Ki > 0.0f)
+  {
+    eInt[0] += ex;      // accumulate integral error
+    eInt[1] += ey;
+    eInt[2] += ez;
+    // Apply I feedback
+    gx += Ki * eInt[0];
+    gy += Ki * eInt[1];
+    gz += Ki * eInt[2];
+  }
+
+
+  // Apply P feedback
+  gx = gx + Kp * ex;
+  gy = gy + Kp * ey;
+  gz = gz + Kp * ez;
+
+ //update quaternion with integrated contribution
+ // small correction 1/11/2022, see https://github.com/kriswiner/MPU9250/issues/447
+gx = gx * (0.5*deltat); // pre-multiply common factors
+gy = gy * (0.5*deltat);
+gz = gz * (0.5*deltat);
+float qa = q1;
+float qb = q2;
+float qc = q3;
+q1 += (-qb * gx - qc * gy - q4 * gz);
+q2 += (qa * gx + qc * gz - q4 * gy);
+q3 += (qa * gy - qb * gz + q4 * gx);
+q4 += (qa * gz + qb * gy - qc * gx);
+
+  // Normalise quaternion
+  norm = sqrt(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4);
+  norm = 1.0f / norm;
+  q[0] = q1 * norm;
+  q[1] = q2 * norm;
+  q[2] = q3 * norm;
+  q[3] = q4 * norm;
+
+}
+
+void quat2eul() {
+    ee[0] = atan2(2.0 * (q[0] * q[1] + q[2] * q[3]), 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]));
+    ee[1] = asin(2.0 * (q[0] * q[2] - q[3] * q[1]));
+    ee[2] = atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3]));
+}
+
+// END IMU DATA
+
+/*
+  FUNCTIONS TO DEAL WITH THE ACTUAL BUZZING OF THE ARDUINO
+
+POINT uses the global buzz_dir angle and converts that to an a quadrant on the helmet to buzz and then makes it buzz
+*/
+void point() {
+    motorNumber = int(buzz_dir/PI * 4.5) + 4;
+    if (motorNumber == 8) {
+      motorNumber = 0;
+    }
+
+  bool state[] = {false,false,false,false,false,false,false,false};
+  if(motorNumber>=0){
+  state[(int)motorNumber] = true;
+  }
+
+  updateVibration(state);
+}
+
+void updateVibration(bool arr[]){
+  for (int i = 0; i <= 7; i++) {
+    if (arr[i]) {
+      digitalWrite(myPins[i], HIGH);
+    } else {
+      digitalWrite(myPins[i], LOW);
+    }
+  }
+}
+
+//
 
 const byte numChars = 32;
 char receivedChars[numChars];
 char tempChars[numChars];        // temporary array for use when parsing
 
-// float dist, dir, user_ang;
 
 boolean newData = false;
 
@@ -115,7 +290,7 @@ void showParsedData() {
     Serial.print(dir);
     Serial.print("  ");
     Serial.print("User Angle: ");
-    Serial.print(dir);
+    Serial.print(unity_heading));
 }
 
 // END UNITY PARSING
@@ -134,9 +309,6 @@ void setup() {
 
   for (int i = 0; i <= 7; i++) pinMode(myPins[i], OUTPUT); // Initiate Digital Output Pins 
 
-  pinMode(A0, INPUT); 
-  pinMode(A1, INPUT);
-
   // Set the number and values of each checkpoint and direction for the user to follow
   num_checkpoints = 8;
 
@@ -144,53 +316,35 @@ void setup() {
   // checkpoints = {{{250, 150}, 270}, {{250, 750}, 90}, {{450, 750}, 90}, {{450, 450}, 270}, {{850, 450}, 270}}, {{850, 750}, 270}, {{750, 750}, 0};
   // initialize the user
   // user = {{0, 0}, 0};
-}
 
-// function to return the distance between the user and the next chckpoint
-float dist(User user, Checkpoint check) {
-  ch_x = check.pos.x;
-  ch_y = check.pos.y;
-  u_x = user.pos.x;
-  u_y = user.pos.y;
-
-  // simple euclidean distance calculator
-  d = sqrt(pow((ch_x - u_x), 2) + pow((ch_x - u_y), 2));
-  return d; // return distance
-}
-
-// function to check whether the user has "reached" a checkpoint
-// return true if the user is within a certain distance threshold of the checkpoint, false otherwise
-bool reached_poses(User you, Checkpoint check) {
-
-  d = dist(you, check);   // check distance between user and the checkpoint
-  if (d < dist_threshold) {
-    return true;
-  } else {
-    return false;
+  if (!IMU.begin()) {
+    Serial.println("Failed to initialize IMU!");
+    while (1);
   }
 
+  pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
+  pinMode(A2, INPUT);
+
 }
+
 
 
 // Obtain the angle with respect to the physical headset for the motors to buzz based on the direction of the next checkpoint and where the user is looking
-int buzzDir(turn_ang, u_heading, imu_heading) {
+void buzzDir(turn_ang, u_heading, imu_heading) {
 
-  // dir = ch.dir;   // get the desired direction of turn from the next checkpoint (0 is straight and positive is anti-clockwise)
-  head = imu_heading;
-  if (head < 0) {
+  // get the desired direction of turn from the next checkpoint (0 is straight and positive is anti-clockwise)
+  imu_head = theta;   // imu heading
+  if (imu_head < 0) {
     // heading is from 0 straight ahead and positive left but negative right toward +/- 180
     // we want 0 to 360 degree heading so change the right hand side from 0 to -180 to 360 to 180
-    head = 360 + head; 
+    imu_head = 360 + head; 
   }
-  buzz_dir = turn_ang - u_heading - imu_heading;  // account for the actual heading of the user (where they are looking) to buzz the correct angle for turn
-  return buzz_dir;
+  buzz_dir = dir - unity_heading - imu_head;  // account for the actual heading of the user (where they are looking) to buzz the correct angle for turn
+  // return buzz_dir;
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
-  // TODO
-  // Parse serial string read into user pos
 
   // UNITY HANDLED CHECKPOINTS
   for (int i = 0; i < num_checkpoints, i++) {   // loop through all checkpoints
@@ -209,52 +363,17 @@ void loop() {
         newData = false;
       }
 
-      // update the user heading from IMU
-      IMU.readMagneticField(x, y, z); // Read IMU DATA
-      heading = (atan2(y,x) * 180) / PI;
+      //Grab IMU data
+      updateIMU();
 
-      // d = dist(user, curr);     // update the current distance of the user to the checkpoint
       if (dist <= buzz_thresh) {   // if the user is within a distance threshold, buzz the directions again
         buzz_thresh = buzz_thresh / 2;    // lower the threshold so that the user is not constantly buzzed with directions
-        buzz_dir = buzzDir(turn_dir, unity_heading, imu_heading) // get the correct direction on the helmet to buzz to convey direction instruction
-        buzz(buzz_dir, buzz_freq / (std_d / d)));   // actaully buzz the helmet 3 times with the correct direction and a frequency proportional to the distance to the checkpoint
+        buzzDir()) // get the correct direction on the helmet to buzz to convey direction instruction
+
+        point();
+        buzz(buzz_dir, buzz_freq / (std_d / dist));   // actaully buzz the helmet 3 times with the correct direction and a frequency proportional to the distance to the checkpoint
       }
     }
   }
-
-  // HARD CODED CHECKPOINTS
-  // Checkpoint curr;
-  // for (int i = 0; i < num_checkpoints, i++) {   // loop through all checkpoints
-  //   curr = checkpoints[i];  // obtain the current checkpoint the user is trying to get to
-  //   buzz_thresh = dist(user, curr);   // get the initial distance to the current checkpoint
-  //   while (!(reached(user, curr))) {  // while the user has not reached the current checkpoint, keep updating and sending directions
-  //     // update user pos
-  //     recvWithStartEndMarkers();
-  //     if (newData == true) {
-  //       strcpy(tempChars, receivedChars);
-  //           // this temporary copy is necessary to protect the original data
-  //           //   because strtok() used in parseData() replaces the commas with \0
-  //       parseData();
-  //       Serial.print("Data Recived - ");
-  //       showParsedData();
-  //       newData = false;
-  //   }
-
-  //     // update the user heading from IMU
-  //     IMU.readMagneticField(x, y, z); // Read IMU DATA
-  //     heading = (atan2(y,x) * 180) / PI;
-
-  //     d = dist(user, curr);     // update the current distance of the user to the checkpoint
-  //     if (d <= buzz_thresh) {   // if the user is within a distance threshold, buzz the directions again
-  //       buzz_thresh = buzz_thresh / 2;    // lower the threshold so that the user is not constantly buzzed with directions
-  //       buzz_dir = buzzDir(curr, heading) // get the correct direction on the helmet to buzz to convey direction instruction
-  //       buzz(buzz_dir, buzz_freq / (std_d / d)));   // actaully buzz the helmet 3 times with the correct direction and a frequency proportional to the distance to the checkpoint
-  //     }
-  //   }
-  // }
-
-  
-
-
 
 }
