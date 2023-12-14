@@ -4,7 +4,8 @@
 VARIABLES FOR BOARD SETUP
 */
 // Pins corresponding to motors in the headband
-const int myPins[] = { 2, 3, 4, 5, 6, 9,10,11 };
+// const int myPins[] = { 2, 3, 4, 5, 6, 7, 8,9 };
+const int myPins[] = { 2, 9, 7, 8, 6, 5, 4, 3 };
 
 
 /*
@@ -83,7 +84,13 @@ float std_d = 10;      // standard distance is 10
 */
 bool new_check = true;
 float buzz_thresh;
-
+bool send_dir = true;
+int num_buzzed = 0;
+long freq;
+unsigned long buzz_time = millis();
+int total_buzzes = 3;
+bool vibing = false;
+int sedentary_time = 3000;
 
 
 /*
@@ -94,10 +101,11 @@ POINT uses the global buzz_dir angle and converts that to an a quadrant on the h
 */
 void point() {
   //  Serial.println(buzz_dir);
-  int motorNumber = int(floor(buzz_dir/360 * 8));
+  int motorNumber = int(floor((buzz_dir + 22.5)/45));
   if (motorNumber == 8) {
     motorNumber = 0;
   }
+  // if (0 < buzz_dir 
   for (int i = 0; i < 8; i++) {
     state[i] = false;
   }
@@ -126,24 +134,19 @@ void updateVibration(){
 // Obtain the angle with respect to the physical headset for the motors to buzz based on the direction of the next checkpoint and where the user is looking
 void buzzDir() {
  // get the desired direction of turn from the next checkpoint (0 is straight and positive is anti-clockwise)
-  float imu_head = theta;   // imu heading
-//  if (imu_head < 0) {
-//    // heading is from 0 straight ahead and positive left but negative right toward +/- 180
-//    // we want 0 to 360 degree heading so change the right hand side from 0 to -180 to 360 to 180
-//    imu_head = 360 + imu_head;
-//  }
-  // float buzz_dir_360 = theta;
-  float buzz_dir_360 = 90 - dir - unity_heading - imu_head;  // account for the actual heading of the user (where they are looking) to buzz the correct angle for turn
-  buzz_dir_360 = ((int) buzz_dir_360) % 360;
-  if (buzz_dir_360 < 0) {
-    buzz_dir_360 = 360 + buzz_dir_360;
+  buzz_dir = 90 - dir;
+  if (buzz_dir < 0) {
+    buzz_dir = 360 + buzz_dir;
   }
- 
-  buzz_dir = buzz_dir_360;
-//  if (buzz_dir > 180) {
-//    buzz_dir = buzz_dir - 360;
-//  }
-//  Serial.println(buzz_dir);
+  buzz_dir = buzz_dir - unity_heading;
+  if (buzz_dir < 0) {
+    buzz_dir = 360 + buzz_dir;
+  }
+  buzz_dir = ((int) buzz_dir + (int) theta) % 360;
+  if (buzz_dir < 0) {
+    buzz_dir = 360 + buzz_dir;
+  }
+  //  Serial.println(buzz_dir);
 }
 
 
@@ -518,15 +521,43 @@ void loop() {
   // buzz(100, 3);
 
   //  Serial.println(theta);
+   
+  if (dist <= buzz_thresh) {   // if the user is within a distance threshold, buzz the directions again
+    buzz_thresh = buzz_thresh / 2;    // lower the threshold so that the user is not constantly buzzed with directions
+    send_dir = true;
+    //  buzzDir(); // get the correct direction on the helmet to buzz to convey direction instruction
+    //  point();
+    //  //  buzz((buzz_freq / (std_d / dist)), 3);   // actually buzz the helmet 3 times with the correct direction and a frequency proportional to the distance to the checkpoint
+    freq = (long)(buzz_freq / (std_d / dist));
+    //  buzz(freq, 3);
+    buzz_time = millis();
+    buzzDir();
+    point();
+    updateVibration();
+    vibing = true;
 
-   if (dist <= buzz_thresh) {   // if the user is within a distance threshold, buzz the directions again
-     buzz_thresh = buzz_thresh / 2;    // lower the threshold so that the user is not constantly buzzed with directions
-     buzzDir(); // get the correct direction on the helmet to buzz to convey direction instruction
-     point();
-    //  buzz((buzz_freq / (std_d / dist)), 3);   // actually buzz the helmet 3 times with the correct direction and a frequency proportional to the distance to the checkpoint
-    int freq = (int)(buzz_freq / (std_d / dist));
-     buzz(freq, 3);
-   }
+  }
 
+  if (send_dir) {
+    if ((millis() - buzz_time > freq) & (!vibing)) {
+      buzzDir();
+      point();
+      updateVibration();
+      buzz_time = millis();
+      vibing = true;
+    }
+    if ((millis() - buzz_time > freq) & (vibing)) {
+      off();
+      num_buzzed = num_buzzed + 1;
+      buzz_time = millis();
+      vibing = false;
+    }
+
+    if (num_buzzed == (total_buzzes)) {
+      send_dir = false;
+      num_buzzed = 0;
+    }
+    
+  }
 
 }
