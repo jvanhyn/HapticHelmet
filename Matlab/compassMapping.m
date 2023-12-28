@@ -32,7 +32,7 @@ while true
     calMagReadings = double(str(7:9)) - calmagxyz;
     [orientation,angularVelocity] = FUSE(accelReadings,gyroReadings);
     
-    heading(:,i)=calMagReadings\orientation;
+    heading(:,i)=calMagReadings\orientajjtion;
     
     
     if(mod(i,10)==0)

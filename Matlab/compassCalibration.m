@@ -15,20 +15,10 @@ i = 1;
 while true
     data = readline(device);
     str = split(data,',');
-    accelReadings = double(str(1:3))'*9.81;
-    gyroReadings = double(str(4:6))'/180*pi;
+    accelReadings(:,i) = double(str(1:3))'*9.81;
+    gyroReadings(:,i) = double(str(4:6))'/180*pi;
     magReadings(:,i) = double(str(7:9))';
     [orientation,angularVelocity] = FUSE(accelReadings,gyroReadings);
-    v1 = orientation*e1;
-
-    %if(mod(i,100)==0)
-    % 
-    % pbaspect([1 1 1])
-    % drawnow
-    % hold off
-    % hold on
-    %axis([-20 20 -20 20 -20 20])
-    %end
    
     i = i+1;
     

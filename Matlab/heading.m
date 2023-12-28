@@ -17,14 +17,6 @@ while true
     
 
     if(mod(i,100)==0)
-    % q = quiver3(0,0,0,magReadings(1,i),magReadings(2,i),magReadings(3,i),'.');
-    % q.AutoScale = 'off';
-    % hold on
-    % plot3(x,y,zeros(1,numel(x)))
-    % xlim([-10 10])
-    % ylim([-10 10])
-    % zlim([-10 10])
-    % drawnow
     h= quiver(0,0,calmagReadings(1,i),calmagReadings(2,i));
     h.AutoScale = "off";
     xlim([-10 10])
